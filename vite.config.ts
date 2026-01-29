@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      allowedHosts: [env.VITE_LOCAL_DEPLOYMENT_URL]
-    }
+      allowedHosts: env.VITE_LOCAL_DEPLOYMENT_URLS?.split(',').map((host) => host.trim()) || [],
+    },
   }
 })
