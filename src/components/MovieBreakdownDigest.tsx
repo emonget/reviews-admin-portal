@@ -44,6 +44,8 @@ export function MovieBreakdownDigest({ movie }: MovieBreakdownDigestProps) {
       try {
         const result = await getTableData<Tables<'digests'>>('digests', {
           filters: { movie_id: movie.ems_id },
+          orderBy: 'created_at',
+          ascending: true
         })
 
         if (result.error) {
@@ -84,25 +86,9 @@ export function MovieBreakdownDigest({ movie }: MovieBreakdownDigestProps) {
     )
   }
 
-  if (digests.length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center p-8 text-center">
-        <div>
-          <div className="bg-gray-100 dark:bg-gray-700 rounded-full p-4 inline-block mb-4">
-            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Breakdown Available</h3>
-          <p className="text-gray-500 dark:text-gray-400 max-w-sm">
-            Breakdown digests have not been generated for this movie yet.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  // Create a map for easy access
+  // Create a map for easy access. 
+  // Since we ordered by created_at ASC, later entries will overwrite earlier ones, 
+  // ensuring we show the latest digest for each topic.
   const digestMap = digests.reduce((acc, digest) => {
     acc[digest.topic] = digest
     return acc
@@ -113,7 +99,7 @@ export function MovieBreakdownDigest({ movie }: MovieBreakdownDigestProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-7xl mx-auto">
         {TOPIC_ORDER.map((topicKey) => {
           const digest = digestMap[topicKey]
-          if (!digest) return null
+          const hasContent = digest && digest.summary
 
           return (
             <div 
@@ -122,14 +108,20 @@ export function MovieBreakdownDigest({ movie }: MovieBreakdownDigestProps) {
             >
               <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
                 <h3 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                  <span className="w-2 h-6 bg-blue-500 rounded-full"></span>
+                  <span className={`w-2 h-6 rounded-full ${hasContent ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></span>
                   {TOPIC_CONFIG[topicKey] || topicKey}
                 </h3>
               </div>
               <div className="p-5 flex-1">
-                <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                  {digest.summary}
-                </p>
+                {hasContent ? (
+                  <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                    {digest.summary}
+                  </p>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full py-8 text-gray-400 dark:text-gray-500">
+                     <p className="text-sm italic">No data available for this section.</p>
+                  </div>
+                )}
               </div>
             </div>
           )

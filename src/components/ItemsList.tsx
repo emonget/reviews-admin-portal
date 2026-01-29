@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react'
 import { MoviesList } from './MoviesList'
 import { getTableData } from '@/services/database'
 import type { Tables } from '@/types/database'
+import type { ReviewData } from '@/types/datamodel'
 
 interface ReviewSource {
   domain: string
   publicationName?: string
   count: number
 }
+
+// Augment Tables<'reviews'> to include ReviewData type for 'data' property
+type ReviewTableRecord = Omit<Tables<'reviews'>, 'data'> & { data: ReviewData }
 
 interface ItemsListProps {
   isLoading: boolean
@@ -32,12 +36,12 @@ export function ItemsList({ isLoading, error, itemsSelector, movies, onMovieSele
       if (itemsSelector !== 'movies') return
 
       try {
-        const result = await getTableData<Tables<'reviews'>>('reviews')
+        const result = await getTableData<ReviewTableRecord>('reviews')
         if (result.data) {
           setTotalReviews(result.data.length)
         }
-      } catch (err) {
-        console.error('Failed to fetch reviews count:', err)
+      } catch (_err) { // err unused
+        console.error('Failed to fetch reviews count:', _err)
         setTotalReviews(0)
       }
     }
@@ -46,14 +50,14 @@ export function ItemsList({ isLoading, error, itemsSelector, movies, onMovieSele
       if (itemsSelector !== 'sources') return
 
       try {
-        const result = await getTableData<Tables<'reviews'>>('reviews')
+        const result = await getTableData<ReviewTableRecord>('reviews')
         if (result.data) {
           setTotalReviews(result.data.length) // Also update total reviews for sources view
 
           const domainCount = new Map<string, { count: number, publicationName: string }>()
 
           result.data.forEach((review) => {
-            const reviewData = review.data as any
+            const reviewData = review.data as ReviewData
             const reviewUrl = reviewData.reviewUrl || reviewData.publicationUrl
             if (reviewUrl) {
               try {
@@ -71,8 +75,8 @@ export function ItemsList({ isLoading, error, itemsSelector, movies, onMovieSele
                     publicationName: reviewData.publicationName || ''
                   })
                 }
-              } catch (err) {
-                // Skip malformed URLs
+              } catch (_err) { // Skip malformed URLs, err unused
+                // console.error("Malformed URL:", _err);
               }
             }
           })
@@ -102,8 +106,8 @@ export function ItemsList({ isLoading, error, itemsSelector, movies, onMovieSele
 
           setAllSources(sourceData)
         }
-      } catch (err) {
-        console.error('Failed to fetch sources:', err)
+      } catch (_err) { // err unused
+        console.error('Failed to fetch sources:', _err)
       }
     }
 

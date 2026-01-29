@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { getTableData } from '@/services/database'
 import type { Tables } from '@/types/database'
+import type { ReviewData } from '@/types/datamodel' // Import ReviewData
+import { ChevronDown, ChevronRight, Filter, Search, XCircle, ChevronUp } from 'lucide-react' // Add ChevronUp to imports
+import { useReviewSelection } from '@/hooks/useReviewSelection'
 
 interface ReviewSource {
   domain: string
@@ -9,21 +12,24 @@ interface ReviewSource {
   count: number
 }
 
+// Augment Tables<'reviews'> to include ReviewData type for 'data' property
+type ReviewTableRecord = Omit<Tables<'reviews'>, 'data'> & { data: ReviewData }
+
 // Extend Tables<'reviews'> to include potential joined fields or data properties if needed
 // For now, we'll just alias it, but keep the name for minimal churn
-type ReviewItem = Tables<'reviews'>
+type ReviewItem = ReviewTableRecord
 
 interface ReviewsListProps {
   selectedMovie?: Tables<'movies'> | null
   selectedSource?: ReviewSource | null
-  displayMode?: 'movie' | 'source' // 'movie' shows movie title, 'source' shows domain
+  displayMode?: 'global' | 'movie' | 'source' // 'movie' shows movie title, 'source' shows domain
   showHeader?: boolean
 }
 
 export function ReviewsList({ 
   selectedMovie, 
   selectedSource, 
-  displayMode = 'movie',
+  displayMode = 'global',
   showHeader = true
 }: ReviewsListProps) {
   const [reviews, setReviews] = useState<ReviewItem[]>([])
@@ -31,6 +37,10 @@ export function ReviewsList({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
+
+  // Data from useReviewSelection hook
+  const { allReviews: globalAllReviews } = useReviewSelection()
+  const [allReviews, setAllReviews] = useState<ReviewTableRecord[]>([]) // Use ReviewTableRecord
 
   // Load movies data on mount for movie name lookups when in movie mode
   useEffect(() => {
@@ -62,13 +72,16 @@ export function ReviewsList({
         setError(null)
 
         // Fetch reviews for the selected item
-        const result = await getTableData<Tables<'reviews'>>('reviews')
+        const result = await getTableData<ReviewTableRecord>('reviews') // Use ReviewTableRecord
         if (result.error) {
           setError(result.error.message)
         } else {
-          let filteredReviews: Tables<'reviews'>[] = []
+          let filteredReviews: ReviewTableRecord[] = [] // Use ReviewTableRecord
 
-          if (displayMode === 'movie') {
+          if (displayMode === 'global') {
+            // Use the globally available reviews from the context
+            filteredReviews = (globalAllReviews as ReviewTableRecord[]) || [] // Cast globalAllReviews
+          } else if (displayMode === 'movie') {
             // Filter reviews by movie_id
             filteredReviews = (result.data || []).filter(
               (review) => review.movie_id === selectedMovie!.ems_id
@@ -78,7 +91,7 @@ export function ReviewsList({
             filteredReviews = (result.data || []).filter(
               (review) => {
                 try {
-                  const reviewData = review.data as any
+                  const reviewData = review.data as ReviewData
                   const reviewUrl = reviewData?.reviewUrl || reviewData?.publicationUrl
                   if (reviewUrl && typeof reviewUrl === 'string') {
                     const urlObj = new URL(reviewUrl)
@@ -86,7 +99,7 @@ export function ReviewsList({
                     return domain === selectedSource!.domain
                   }
                   return false
-                } catch (urlError) {
+                } catch { // urlError is unused
                   // Skip malformed URLs instead of crashing
                   return false
                 }
@@ -96,22 +109,22 @@ export function ReviewsList({
 
           // Sort by isTopCritic (top critics first) then by creation date (most recent first)
           filteredReviews.sort((a, b) => {
-            const aData = a.data as any
-            const bData = b.data as any
+            const aData = a.data as ReviewData // Use ReviewData
+            const bData = b.data as ReviewData // Use ReviewData
 
             // Top critics first
             if (aData?.isTopCritic && !bData?.isTopCritic) return -1
             if (!aData?.isTopCritic && bData?.isTopCritic) return 1
 
             // Then by creation date (if available)
-            const aDate = aData?.creationDate ? new Date(aData.creationDate).getTime() : 0
-            const bDate = bData?.creationDate ? new Date(bData.creationDate).getTime() : 0
+            const aDate = a.created_at ? new Date(a.created_at).getTime() : 0
+            const bDate = b.created_at ? new Date(b.created_at).getTime() : 0
             return bDate - aDate
           })
 
           setReviews(filteredReviews)
         }
-      } catch (err) {
+      } catch (_err) { // err unused
         setError('Failed to fetch reviews')
       } finally {
         setIsLoading(false)
@@ -119,7 +132,7 @@ export function ReviewsList({
     }
 
     fetchReviews()
-  }, [selectedMovie, selectedSource, displayMode])
+  }, [selectedMovie, selectedSource, displayMode, globalAllReviews])
 
   const formatFetchDate = (dateString: string | null) => {
     if (!dateString) return '-'
@@ -128,7 +141,7 @@ export function ReviewsList({
   }
 
   const getSourceUrl = (review: ReviewItem) => {
-    const reviewData = review.data as any
+    const reviewData = review.data as ReviewData // Use ReviewData
     return reviewData?.reviewUrl || reviewData?.publicationUrl || ''
   }
 
@@ -186,13 +199,7 @@ export function ReviewsList({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      {showHeader && (
-        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            {getHeaderTitle()}
-          </h3>
-        </div>
-      )}
+      {/* Removed the header section */}
 
       {/* Content */}
       {!hasSelection ? (
@@ -210,7 +217,7 @@ export function ReviewsList({
           {isLoading && (
             <div className="px-6 py-8 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
-              <p className="text-gray-600">Loading reviews...</p>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Loading reviews...</span>
             </div>
           )}
 
@@ -231,7 +238,7 @@ export function ReviewsList({
               ) : (
                 <div className="divide-y divide-gray-200 dark:divide-gray-600">
                   {reviews.map((review) => {
-                    const reviewData = review.data as any
+                    const reviewData = review.data as ReviewData // Use ReviewData
                     const isTopCritic = reviewData?.isTopCritic
 
                     return (
@@ -333,9 +340,9 @@ export function ReviewsList({
         <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {reviews.length} review{reviews.length !== 1 ? 's' : ''} found
-            {reviews.some(r => (r.data as any)?.isTopCritic) && (
+            {reviews.some(r => (r.data as ReviewData)?.isTopCritic) && (
               <span className="ml-2">
-                • {reviews.filter(r => (r.data as any)?.isTopCritic).length} top critic{reviews.filter(r => (r.data as any)?.isTopCritic).length !== 1 ? 's' : ''}
+                • {reviews.filter(r => (r.data as ReviewData)?.isTopCritic).length} top critic{reviews.filter(r => (r.data as ReviewData)?.isTopCritic).length !== 1 ? 's' : ''}
               </span>
             )}
           </p>

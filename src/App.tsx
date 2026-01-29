@@ -7,7 +7,7 @@ import { ReportsPage } from './components/ReportsPage'
 import { CapturePage } from './components/CapturePage'
 import { ThemeToggle } from './components/ThemeToggle'
 import { NavMenu } from './components/NavMenu'
-import { ThemeProvider } from './contexts/theme'
+import { ThemeProvider } from './components/ThemeProvider'
 
 function App() {
 

@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 
-export interface QueryResult<T = any> {
+export interface QueryResult<T = unknown> {
   data: T[] | null
   error: Error | null
   isLoading: boolean
@@ -15,13 +15,13 @@ export interface PaginationOptions {
 
 export interface DatabaseServiceOptions extends PaginationOptions {
   select?: string
-  filters?: Record<string, any>
+  filters?: Record<string, unknown>
 }
 
 /**
  * Generic function to fetch data from any table
  */
-export async function getTableData<T = any>(
+export async function getTableData<T = unknown>(
   tableName: string,
   options: DatabaseServiceOptions = {}
 ): Promise<QueryResult<T>> {
@@ -33,7 +33,8 @@ export async function getTableData<T = any>(
     // Apply filters if provided
     if (options.filters) {
       Object.entries(options.filters).forEach(([key, value]) => {
-        query = query.eq(key, value)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        query = query.eq(key, value as any)
       })
     }
 

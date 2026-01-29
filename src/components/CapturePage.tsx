@@ -2,8 +2,17 @@ import { useMemo, useState } from 'react'
 import { useReviewSelection } from '@/hooks/useReviewSelection'
 import { SearchComponent } from './SearchComponent'
 import type { Tables } from '@/types/database'
+import type { ReviewData } from '@/types/datamodel'
 
-type ReviewItem = Tables<'reviews'>
+// Define ReviewSource type for clarity if not globally available
+interface ReviewSource {
+  domain: string
+  publicationName?: string
+  count: number
+}
+
+// Augment Tables<'reviews'> to include ReviewData type for 'data' property
+type ReviewItem = Omit<Tables<'reviews'>, 'data'> & { data: ReviewData }
 
 export function CapturePage() {
   const [selectedReview, setSelectedReview] = useState<ReviewItem | null>(null)
@@ -23,12 +32,12 @@ export function CapturePage() {
     setSelectedReview(review)
   }
 
-  const handleMovieSelectAndClear = (movie: any) => {
+  const handleMovieSelectAndClear = (movie: Tables<'movies'>) => {
     handleMovieSelect(movie)
     setSelectedReview(null)
   }
 
-  const handleSourceSelectAndClear = (source: any) => {
+  const handleSourceSelectAndClear = (source: ReviewSource) => {
     handleSourceSelect(source)
     setSelectedReview(null)
   }
@@ -42,7 +51,7 @@ export function CapturePage() {
     if (selectedSource) {
       return allReviews.filter((review) => {
         try {
-          const reviewData = review.data as any
+          const reviewData = review.data as ReviewData
           const reviewUrl = reviewData?.reviewUrl || reviewData?.publicationUrl
           if (reviewUrl && typeof reviewUrl === 'string') {
             const urlObj = new URL(reviewUrl)
@@ -50,7 +59,7 @@ export function CapturePage() {
             return domain === selectedSource.domain
           }
           return false
-        } catch (urlError) {
+        } catch { // urlError is unused
           return false
         }
       })
@@ -97,7 +106,7 @@ export function CapturePage() {
                           className={`px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${selectedReview?.review_id === review.review_id ? 'bg-gray-100 dark:bg-gray-700' : ''}`}
                       >
                           <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                              {(review.data as any)?.criticName || 'Unknown Critic'}
+                              {(review.data as ReviewData)?.criticName || 'Unknown Critic'}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
                               ID: {review.review_id}
@@ -149,7 +158,7 @@ export function CapturePage() {
             <div className="flex-1 overflow-y-auto p-6">
               {activeTab === 'content' && (
                 <div>
-                  <h2 className="text-xl font-bold mb-4">{(selectedReview.data as any)?.title || 'Review Content'}</h2>
+                  <h2 className="text-xl font-bold mb-4">{(selectedReview.data as ReviewData)?.title || 'Review Content'}</h2>
                   <pre className="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200">
                     {JSON.stringify(selectedReview.data, null, 2)}
                   </pre>
